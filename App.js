@@ -1,4 +1,4 @@
-import { React, useState } from "react";
+import { React, useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -9,8 +9,11 @@ import {
   TouchableWithoutFeedback,
   TextInput,
   ScrollView,
+  Alert,
+  Platform,
 } from "react-native";
-import AsnyncStorage from "@react-native-async-storage/async-storage";
+import { Fontisto } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "./color.js";
 
 const STORAGE_KEY = "@toDos";
@@ -19,6 +22,11 @@ export default function App() {
   const [working, setWorking] = useState(true);
   const [text, setText] = useState("");
   const [toDos, setToDos] = useState({});
+
+  useEffect(() => {
+    loadToDos();
+  }, []);
+
   const travel = () => setWorking(false);
   const work = () => setWorking(true);
   const onChangeText = (payload) => setText(payload);
@@ -26,7 +34,16 @@ export default function App() {
   const saveToDos = async (toSave) => {
     //toDos를 string으로, + awiat AsyncStorage.setItem해줄거임
 
-    await AsnyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  };
+
+  const loadToDos = async () => {
+    const s = await AsyncStorage.getItem(STORAGE_KEY);
+    if (s !== null) {
+      setToDos(JSON.parse(s));
+    } else {
+      setToDos({});
+    }
   };
 
   const addTodo = async () => {
@@ -34,16 +51,40 @@ export default function App() {
       return;
     }
 
-    const newTodos = {
+    const newToDos = {
       ...toDos,
       [Date.now()]: { text, working },
     };
-
     setToDos(newToDos);
     await saveToDos(newToDos);
     setText("");
   };
-  console.log(toDos);
+
+  const deleteToDo = async (key) => {
+    if (Platform.OS === "web") {
+      const ok = confirm("Do you want to delete this To Do?");
+      if (ok) {
+        const newToDos = { ...toDos };
+        delete newToDos[key];
+        setToDos(newToDos);
+        await saveToDos(newToDos);
+      }
+    } else {
+      Alert.alert("Delete To Do?", "Are you sure?", [
+        { text: "Cancel" },
+        {
+          text: "I'm Sure",
+          style: "destructive", //style은 ios에서만 가능
+          onPress: async () => {
+            const newToDos = { ...toDos };
+            delete newToDos[key];
+            setToDos(newToDos);
+            await saveToDos(newToDos);
+          },
+        },
+      ]);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -73,7 +114,9 @@ export default function App() {
         onChangeText={onChangeText}
         returnKeyType="done"
         value={text}
-        placeholder={working ? "Add a To do" : "Where do you want to go?"}
+        placeholder={
+          working ? "What do you have to do?" : "Where do you want to go?"
+        }
         style={styles.input}
       />
       <ScrollView>
@@ -81,6 +124,9 @@ export default function App() {
           toDos[key].working === working ? (
             <View style={styles.toDo} key={key}>
               <Text style={styles.toDoText}>{toDos[key].text}</Text>
+              <TouchableOpacity onPress={() => deleteToDo(key)}>
+                <Fontisto name="trash" size={17} color="white" />
+              </TouchableOpacity>
             </View>
           ) : null,
         )}
@@ -119,6 +165,9 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 40,
     borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   toDoText: {
     color: "white",
